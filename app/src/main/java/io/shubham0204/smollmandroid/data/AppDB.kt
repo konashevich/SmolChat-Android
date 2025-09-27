@@ -75,6 +75,7 @@ class AppDB(
         systemPrompt: String = "You are a helpful assistant.",
         llmModelId: Long = -1,
         isTask: Boolean = false,
+        contextSize: Int = 2048
     ): Chat =
         runBlocking(Dispatchers.IO) {
             val newChat =
@@ -84,7 +85,7 @@ class AppDB(
                     dateCreated = Date(),
                     dateUsed = Date(),
                     llmModelId = llmModelId,
-                    contextSize = 2048,
+                    contextSize = contextSize,
                     chatTemplate = chatTemplate,
                     isTask = isTask,
                 )
@@ -155,16 +156,16 @@ class AppDB(
         path: String,
         contextSize: Int,
         chatTemplate: String,
-    ) = runBlocking(Dispatchers.IO) {
-        db.llmModelDao().insertModels(
-            LLMModel(
-                name = name,
-                url = url,
-                path = path,
-                contextSize = contextSize,
-                chatTemplate = chatTemplate,
-            ),
+    ): LLMModel = runBlocking(Dispatchers.IO) {
+        val newModel = LLMModel(
+            name = name,
+            url = url,
+            path = path,
+            contextSize = contextSize,
+            chatTemplate = chatTemplate,
         )
+        val newModelId = db.llmModelDao().insertModels(newModel)[0]
+        newModel.copy(id = newModelId)
     }
 
     fun getModel(id: Long): LLMModel? =

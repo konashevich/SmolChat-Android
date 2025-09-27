@@ -37,10 +37,6 @@ import io.shubham0204.smollmandroid.data.AppDB
 import io.shubham0204.smollmandroid.data.HFModelsAPI
 import io.shubham0204.smollmandroid.data.LLMModel
 import io.shubham0204.smollmandroid.llm.exampleModelsList
-import io.shubham0204.smollmandroid.ui.components.hideProgressDialog
-import io.shubham0204.smollmandroid.ui.components.setProgressDialogText
-import io.shubham0204.smollmandroid.ui.components.setProgressDialogTitle
-import io.shubham0204.smollmandroid.ui.components.showProgressDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -165,30 +161,34 @@ class DownloadModelsViewModel(
             fileName = cursor.getString(nameIndex)
         }
         if (fileName.isNotEmpty()) {
-            setProgressDialogTitle(context.getString(R.string.dialog_progress_copy_model_title))
-            setProgressDialogText(
-                context.getString(R.string.dialog_progress_copy_model_text, fileName),
-            )
-            showProgressDialog()
             CoroutineScope(Dispatchers.IO).launch {
+                val modelPath = File(context.filesDir, fileName).absolutePath
                 context.contentResolver.openInputStream(uri).use { inputStream ->
-                    FileOutputStream(File(context.filesDir, fileName)).use { outputStream ->
+                    FileOutputStream(modelPath).use { outputStream ->
                         inputStream?.copyTo(outputStream)
                     }
                 }
                 val ggufReader = GGUFReader()
-                ggufReader.load(File(context.filesDir, fileName).absolutePath)
-                val contextSize = ggufReader.getContextSize() ?: SmolLM.DefaultInferenceParams.contextSize
-                val chatTemplate = ggufReader.getChatTemplate() ?: SmolLM.DefaultInferenceParams.chatTemplate
-                appDB.addModel(
+                ggufReader.load(modelPath)
+                val contextSize = ggufReader.getContextSize()?.toInt() ?: defaultContextSize
+                val chatTemplate = ggufReader.getChatTemplate() ?: ""
+
+                val newModel = appDB.addModel(
                     fileName,
                     "",
                     Paths.get(context.filesDir.absolutePath, fileName).toString(),
-                    contextSize.toInt(),
+                    contextSize,
                     chatTemplate,
                 )
+                val chatCount = appDB.getChatsCount()
+                appDB.addChat(
+                    chatName = "Untitled ${chatCount + 1}",
+                    llmModelId = newModel.id,
+                    contextSize = newModel.contextSize,
+                    chatTemplate = newModel.chatTemplate
+                )
+
                 withContext(Dispatchers.Main) {
-                    hideProgressDialog()
                     onComplete()
                 }
             }

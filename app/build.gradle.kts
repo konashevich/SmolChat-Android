@@ -26,15 +26,11 @@ android {
     productFlavors {
         create("smolChat") { // This will be the default/original flavor
             dimension = "branding"
-            // No applicationIdSuffix needed if it uses the defaultConfig.applicationId
-            // No resValue for app_name needed if it uses the main strings.xml
         }
         create("crisisAI") {
             dimension = "branding"
-            applicationIdSuffix = ".crisisai" // Results in io.shubham0204.smollmandroid.crisisai
+            applicationIdSuffix = ".crisisai"
             resValue("string", "app_name", "Crisis AI")
-            // You can also add version name suffix if needed, e.g.:
-            // versionNameSuffix = "-crisisAI"
         }
     }
 

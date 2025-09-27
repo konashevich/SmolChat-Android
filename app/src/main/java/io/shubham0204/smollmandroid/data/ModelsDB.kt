@@ -45,7 +45,7 @@ interface LLMModelDao {
     suspend fun getModel(id: Long): LLMModel
 
     @Insert
-    suspend fun insertModels(vararg models: LLMModel)
+    suspend fun insertModels(vararg models: LLMModel): LongArray
 
     @Query("DELETE FROM LLMModel WHERE id = :id")
     suspend fun deleteModel(id: Long)
