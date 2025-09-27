@@ -21,6 +21,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.OpenableColumns
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.net.toUri
@@ -35,6 +36,7 @@ import io.shubham0204.smollmandroid.R
 import io.shubham0204.smollmandroid.data.AppDB
 import io.shubham0204.smollmandroid.data.HFModelsAPI
 import io.shubham0204.smollmandroid.data.LLMModel
+import io.shubham0204.smollmandroid.llm.exampleModelsList
 import io.shubham0204.smollmandroid.ui.components.hideProgressDialog
 import io.shubham0204.smollmandroid.ui.components.setProgressDialogText
 import io.shubham0204.smollmandroid.ui.components.setProgressDialogTitle
@@ -50,6 +52,8 @@ import org.koin.core.annotation.Single
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Paths
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.State
 
 @Single
 class DownloadModelsViewModel(
@@ -65,8 +69,16 @@ class DownloadModelsViewModel(
     val modelInfoAndTree: StateFlow<Pair<HFModelInfo.ModelInfo, List<HFModelTree.HFModelFile>>?> =
         _modelInfoAndTree
 
-    val selectedModelState = mutableStateOf<LLMModel?>(null)
+    private val _downloadProgress = mutableFloatStateOf(0f)
+    val downloadProgress: State<Float> = _downloadProgress
+
+    private val _isDownloaded = mutableStateOf(false)
+    val isDownloaded: State<Boolean> = _isDownloaded
+
+    val downloadedModelUri = mutableStateOf<Uri?>(null)
     val modelUrlState = mutableStateOf("")
+    val selectedModelState = mutableStateOf<LLMModel?>(null)
+
 
     var viewModelId: String? = null
 
@@ -74,9 +86,8 @@ class DownloadModelsViewModel(
         context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
     fun downloadModel() {
-        // Downloading files in Android with the DownloadManager API
-        // Ref: https://youtu.be/4t8EevQSYK4?feature=shared
-        val modelUrl = modelUrlState.value.ifEmpty { selectedModelState.value?.url ?: return }
+        selectedModelState.value = exampleModelsList.first()
+        val modelUrl = selectedModelState.value?.url ?: return
         val fileName = modelUrl.substring(modelUrl.lastIndexOf('/') + 1)
         val request =
             DownloadManager
@@ -90,13 +101,56 @@ class DownloadModelsViewModel(
                 ).setNotificationVisibility(
                     DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED,
                 ).setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-        downloadManager.enqueue(request)
+        val downloadId = downloadManager.enqueue(request)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            var downloading = true
+            while (downloading) {
+                val q = DownloadManager.Query()
+                q.setFilterById(downloadId)
+                val cursor = downloadManager.query(q)
+                if (cursor != null && cursor.moveToFirst()) {
+                    try {
+                        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                        when (status) {
+                            DownloadManager.STATUS_SUCCESSFUL -> {
+                                downloading = false
+                                _isDownloaded.value = true
+                                downloadedModelUri.value = downloadManager.getUriForDownloadedFile(downloadId)
+                            }
+                            DownloadManager.STATUS_FAILED -> {
+                                val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                                Log.e("DownloadManager", "Download failed. Reason: $reason")
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                                }
+                                downloading = false
+                            }
+                            DownloadManager.STATUS_RUNNING -> {
+                                val bytesDownloaded = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                                val bytesTotal = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                                if (bytesTotal > 0) {
+                                    _downloadProgress.floatValue = (bytesDownloaded.toFloat() / bytesTotal.toFloat())
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DownloadManager", "Error while monitoring download", e)
+                        downloading = false
+                    } finally {
+                        cursor.close()
+                    }
+                } else {
+                    downloading = false
+                }
+            }
+        }
     }
 
     fun getModels(query: String): Flow<PagingData<HFModelSearch.ModelSearchResult>> = hfModelsAPI.getModelsList(query)
 
     /**
-     * Given the model file URI, copy the model file to the app's internal directory. Once copied,
+     * Given the model file URI, copy the model file to the. app's internal directory. Once copied,
      * add a new LLMModel entity with modelName=fileName where fileName is the name of the model
      * file.
      */

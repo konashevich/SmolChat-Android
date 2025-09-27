@@ -83,6 +83,7 @@ import io.shubham0204.smollmandroid.ui.components.createAlertDialog
 import io.shubham0204.smollmandroid.ui.screens.chat.ChatActivity
 import io.shubham0204.smollmandroid.ui.theme.SmolLMAndroidTheme
 import org.koin.android.ext.android.inject
+import androidx.compose.material3.LinearProgressIndicator
 
 class DownloadModelActivity : ComponentActivity() {
     private var openChatScreen: Boolean = true
@@ -139,8 +140,8 @@ class DownloadModelActivity : ComponentActivity() {
     }
 
     private enum class AddNewModelStep {
-        ImportModel,
         DownloadModel,
+        DownloadProgress,
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -163,20 +164,18 @@ class DownloadModelActivity : ComponentActivity() {
                             .verticalScroll(rememberScrollState()),
                 ) {
                     when (addNewModelStep) {
-                        AddNewModelStep.ImportModel -> {
-                            SelectModelScreen(
-                                onPrevSectionClick = {
-                                    addNewModelStep = AddNewModelStep.DownloadModel
+                        AddNewModelStep.DownloadModel -> {
+                            DownloadModelScreen(
+                                onNextSectionClick = {
+                                    addNewModelStep = AddNewModelStep.DownloadProgress
                                 },
                                 modifier = Modifier.fillMaxSize().padding(8.dp),
                             )
                         }
-
-                        AddNewModelStep.DownloadModel -> {
-                            DownloadModelScreen(
-                                onHFModelSelectClick = onHFModelSelectClick,
-                                onNextSectionClick = {
-                                    addNewModelStep = AddNewModelStep.ImportModel
+                        AddNewModelStep.DownloadProgress -> {
+                            DownloadProgressScreen(
+                                onPrevSectionClick = {
+                                    addNewModelStep = AddNewModelStep.DownloadModel
                                 },
                                 modifier = Modifier.fillMaxSize().padding(8.dp),
                             )
@@ -190,170 +189,61 @@ class DownloadModelActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun ModelsList(viewModel: DownloadModelsViewModel) {
-        var selectedModel by remember { viewModel.selectedModelState }
-        Column(verticalArrangement = Arrangement.Center) {
-            exampleModelsList.forEach { model ->
-                Row(
-                    Modifier
-                        .clickable { selectedModel = model }
-                        .fillMaxWidth()
-                        .background(
-                            if (model == selectedModel) {
-                                MaterialTheme.colorScheme.surfaceContainer
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            },
-                            RoundedCornerShape(
-                                8.dp,
-                            ),
-                        ).padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    if (model == selectedModel) {
-                        Icon(
-                            FeatherIcons.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                    Text(
-                        color =
-                            if (model == selectedModel) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme
-                                    .colorScheme.onSurface
-                            },
-                        text = model.name,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
     private fun DownloadModelScreen(
-        onHFModelSelectClick: () -> Unit,
         onNextSectionClick: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
         Column(modifier = modifier) {
             Text(
-                text = stringResource(R.string.download_model_step_title),
+                text = "Welcome to CrisisAI",
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                stringResource(R.string.download_model_step_des),
+                "Your personal AI assistant for crisis situations.",
                 style = MaterialTheme.typography.labelSmall,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            ModelsList(viewModel)
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                enabled =
-                    viewModel.selectedModelState.value != null ||
-                        viewModel.modelUrlState.value.isNotBlank(),
-                onClick = { viewModel.downloadModel() },
-                shape = RoundedCornerShape(4.dp),
+            Button(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                onClick = {
+                    viewModel.downloadModel()
+                    onNextSectionClick()
+                },
             ) {
-                Icon(FeatherIcons.Download, contentDescription = "Download Selected Model")
-                AppSpacer4W()
-                Text(stringResource(R.string.download_model_download))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "OR",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.download_model_step_hf_browse),
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onHFModelSelectClick,
-                shape = RoundedCornerShape(4.dp),
-            ) {
-                Icon(FeatherIcons.Globe, contentDescription = "Download Selected Model")
-                AppSpacer4W()
-                Text(stringResource(R.string.download_model_browse_hf))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(verticalArrangement = Arrangement.Bottom) {
-                Text(
-                    text = stringResource(R.string.download_model_next_step_des),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    onClick = onNextSectionClick,
-                ) {
-                    Icon(FeatherIcons.ArrowRight, contentDescription = null)
-                    Text(stringResource(R.string.button_text_next))
-                }
+                Text(stringResource(R.string.button_text_next))
             }
         }
     }
 
     @Composable
-    private fun SelectModelScreen(
+    private fun DownloadProgressScreen(
         onPrevSectionClick: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
-        val launcher =
-            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { activityResult ->
-                activityResult.data?.let {
-                    it.data?.let { uri ->
-                        if (checkGGUFFile(uri)) {
-                            viewModel.copyModelFile(uri, onComplete = { openChatActivity() })
-                        } else {
-                            createAlertDialog(
-                                dialogTitle = getString(R.string.dialog_invalid_file_title),
-                                dialogText = getString(R.string.dialog_invalid_file_text),
-                                dialogPositiveButtonText = "OK",
-                                onPositiveButtonClick = {},
-                                dialogNegativeButtonText = null,
-                                onNegativeButtonClick = null,
-                            )
-                        }
-                    }
-                }
-            }
+        val downloadProgress by viewModel.downloadProgress
+        val isDownloaded by viewModel.isDownloaded
+
         Column(modifier = modifier) {
             Text(
-                text = stringResource(R.string.import_model_step_title),
+                text = "Downloading Model...",
                 style = MaterialTheme.typography.headlineSmall,
             )
-            Text(
-                text = stringResource(R.string.import_model_step_des),
-                style = MaterialTheme.typography.labelSmall,
-            )
+            Spacer(modifier = Modifier.height(16.dp))
+            if (downloadProgress > 0) {
+                LinearProgressIndicator(
+                    progress = downloadProgress,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
-                    val intent =
-                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            setType("application/octet-stream")
-                            putExtra(
-                                DocumentsContract.EXTRA_INITIAL_URI,
-                                Environment
-                                    .getExternalStoragePublicDirectory(
-                                        Environment.DIRECTORY_DOWNLOADS,
-                                    ).toUri(),
-                            )
-                        }
-                    launcher.launch(intent)
+                    viewModel.copyModelFile(viewModel.downloadedModelUri.value!!, onComplete = { openChatActivity() })
                 },
+                enabled = isDownloaded,
                 shape = RoundedCornerShape(4.dp),
             ) {
-                Text(stringResource(R.string.download_models_select_gguf_button))
+                Text("Finish")
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(
@@ -367,17 +257,5 @@ class DownloadModelActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    // check if the first four bytes of the file
-    // represent the GGUF magic number
-    // see:https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#file-structure
-    private fun checkGGUFFile(uri: Uri): Boolean {
-        contentResolver.openInputStream(uri)?.use { inputStream ->
-            val ggufMagicNumberBytes = ByteArray(4)
-            inputStream.read(ggufMagicNumberBytes)
-            return ggufMagicNumberBytes.contentEquals(byteArrayOf(71, 71, 85, 70))
-        }
-        return false
     }
 }
