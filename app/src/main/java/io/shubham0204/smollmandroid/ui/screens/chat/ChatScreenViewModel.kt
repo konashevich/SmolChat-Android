@@ -284,6 +284,7 @@ class ChatScreenViewModel(
     fun switchChat(chat: Chat) {
         stopGeneration()
         _currChatState.value = chat
+        _modelLoadState.value = ModelLoadingState.NOT_LOADED
     }
 
     fun deleteChat(chat: Chat) {
@@ -314,9 +315,17 @@ class ChatScreenViewModel(
         _currChatState.value?.let { chat ->
             val model = modelsRepository.getModelFromId(chat.llmModelId)
             if (chat.llmModelId == -1L || model == null) {
+                LOGD("loadModel(): model missing or not selected. Showing model list dialog.")
                 _showSelectModelListDialogState.value = true
             } else {
+                // Prevent launching another load if one is already in progress
+                if (_modelLoadState.value == ModelLoadingState.IN_PROGRESS) {
+                    LOGD("loadModel(): Ignoring duplicate load request while IN_PROGRESS for chatId=${chat.id}")
+                    return
+                }
+                LOGD("loadModel(): Starting model load for chatId=${chat.id}, modelPath=${model.path}")
                 _modelLoadState.value = ModelLoadingState.IN_PROGRESS
+                val chatIdAtLoad = chat.id
                 smolLMManager.load(
                     chat,
                     model.path,
@@ -331,6 +340,7 @@ class ChatScreenViewModel(
                         chat.useMlock,
                     ),
                     onError = { e ->
+                        LOGD("loadModel(): FAILURE for chatId=$chatIdAtLoad error=${e.message}")
                         _modelLoadState.value = ModelLoadingState.FAILURE
                         onComplete(ModelLoadingState.FAILURE)
                         createAlertDialog(
@@ -349,11 +359,27 @@ class ChatScreenViewModel(
                         )
                     },
                     onSuccess = {
-                        _modelLoadState.value = ModelLoadingState.SUCCESS
-                        onComplete(ModelLoadingState.SUCCESS)
+                        // Ensure we are still on the same chat before setting success
+                        if (_currChatState.value?.id == chatIdAtLoad) {
+                            LOGD("loadModel(): SUCCESS for chatId=$chatIdAtLoad")
+                            _modelLoadState.value = ModelLoadingState.SUCCESS
+                            onComplete(ModelLoadingState.SUCCESS)
+                        } else {
+                            LOGD("loadModel(): SUCCESS ignored due to chat switch. Expected=$chatIdAtLoad current=${_currChatState.value?.id}")
+                        }
+                    },
+                    onCancelled = {
+                        if (_currChatState.value?.id == chatIdAtLoad) {
+                            LOGD("loadModel(): CANCELLED for chatId=$chatIdAtLoad resetting to NOT_LOADED")
+                            _modelLoadState.value = ModelLoadingState.NOT_LOADED
+                        } else {
+                            LOGD("loadModel(): CANCELLED for old chatId=$chatIdAtLoad currentChatId=${_currChatState.value?.id}")
+                        }
                     },
                 )
             }
+        } ?: run {
+            LOGD("loadModel(): No current chat selected; aborting load")
         }
     }
 

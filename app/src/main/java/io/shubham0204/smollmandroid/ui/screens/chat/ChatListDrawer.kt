@@ -53,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ import io.shubham0204.smollmandroid.ui.components.createAlertDialog
 import io.shubham0204.smollmandroid.ui.components.createTextFieldDialog
 import io.shubham0204.smollmandroid.ui.components.noRippleClickable
 import io.shubham0204.smollmandroid.ui.screens.chat.dialogs.createFolderOptionsDialog
+import kotlinx.coroutines.launch
 
 @Composable
 fun DrawerUI(
@@ -85,6 +87,7 @@ fun DrawerUI(
     onManageTasksClick: () -> Unit,
     onCreateTaskClick: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     Surface {
         Column(
             modifier =
@@ -101,10 +104,20 @@ fun DrawerUI(
             ) {
                 Button(
                     onClick = {
-                        val chatCount = viewModel.appDB.getChatsCount()
-                        val newChat =
-                            viewModel.appDB.addChat(chatName = "Untitled ${chatCount + 1}")
-                        onItemClick(newChat)
+                        scope.launch {
+                            val chatCount = viewModel.appDB.getChatsCount()
+                            val models = viewModel.appDB.getModelsList()
+                            if (models.isNotEmpty()) {
+                                val defaultModel = models.first()
+                                val newChat = viewModel.appDB.addChat(
+                                    chatName = "Untitled ${chatCount + 1}",
+                                    llmModelId = defaultModel.id,
+                                    chatTemplate = defaultModel.chatTemplate,
+                                    contextSize = defaultModel.contextSize
+                                )
+                                onItemClick(newChat)
+                            }
+                        }
                     },
                 ) {
                     Icon(FeatherIcons.Plus, contentDescription = "New Chat")

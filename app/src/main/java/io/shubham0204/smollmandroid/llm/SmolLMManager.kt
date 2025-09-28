@@ -56,34 +56,49 @@ class SmolLMManager(
         params: SmolLM.InferenceParams = SmolLM.InferenceParams(),
         onError: (Exception) -> Unit,
         onSuccess: () -> Unit,
+        onCancelled: () -> Unit,
     ) {
         try {
             this.chat = chat
+            // Cancel any previous loading job to avoid race conditions when rapidly switching chats
+            modelInitJob?.let { if (it.isActive) it.cancel() }
+            // If an instance is already loaded, close it BEFORE launching the new job
+            // so that we don't cancel the newly created job inadvertently (self-cancellation bug).
+            if (isInstanceLoaded) {
+                close()
+            }
             modelInitJob =
                 CoroutineScope(Dispatchers.Default).launch {
-                    if (isInstanceLoaded) {
-                        close()
-                    }
-                    instance.load(modelPath, params)
-                    LOGD("Model loaded")
-                    if (chat.systemPrompt.isNotEmpty()) {
-                        instance.addSystemPrompt(chat.systemPrompt)
-                        LOGD("System prompt added")
-                    }
-                    if (!chat.isTask) {
-                        appDB.getMessagesForModel(chat.id).forEach { message ->
-                            if (message.isUserMessage) {
-                                instance.addUserMessage(message.message)
-                                LOGD("User message added: ${message.message}")
-                            } else {
-                                instance.addAssistantMessage(message.message)
-                                LOGD("Assistant message added: ${message.message}")
+                    try {
+                        instance.load(modelPath, params)
+                        LOGD("Model loaded")
+                        if (chat.systemPrompt.isNotEmpty()) {
+                            instance.addSystemPrompt(chat.systemPrompt)
+                            LOGD("System prompt added")
+                        }
+                        if (!chat.isTask) {
+                            appDB.getMessagesForModel(chat.id).forEach { message ->
+                                if (message.isUserMessage) {
+                                    instance.addUserMessage(message.message)
+                                    LOGD("User message added: ${message.message}")
+                                } else {
+                                    instance.addAssistantMessage(message.message)
+                                    LOGD("Assistant message added: ${message.message}")
+                                }
                             }
                         }
-                    }
-                    withContext(Dispatchers.Main) {
-                        isInstanceLoaded = true
-                        onSuccess()
+                        withContext(Dispatchers.Main) {
+                            isInstanceLoaded = true
+                            onSuccess()
+                        }
+                    } catch (_: CancellationException) {
+                        // Loading was cancelled (likely due to chat switch). Reset state via callback.
+                        withContext(Dispatchers.Main) { onCancelled() }
+                        LOGD("Model load cancelled")
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            onError(e)
+                        }
                     }
                 }
         } catch (e: Exception) {

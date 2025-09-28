@@ -1,11 +1,11 @@
 plugins {
     id("java-library")
     alias(libs.plugins.jetbrains.kotlin.jvm)
-    kotlin("plugin.serialization") version "2.1.0"
+    // Use the root-declared Kotlin serialization plugin version (2.0.0) to avoid classpath mismatch
+    kotlin("plugin.serialization")
 }
 
 val ktorVersion = "3.0.2"
-val kotlinSerializationVersion = "1.7.3"
 
 dependencies {
     implementation("io.ktor:ktor-client-core:$ktorVersion")

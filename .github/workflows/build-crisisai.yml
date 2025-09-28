@@ -1,0 +1,67 @@
+name: Build Crisis AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+            distribution: temurin
+            java-version: '17'
+            cache: gradle
+
+      - name: Set up Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 35
+          target: default
+          ndk: 27.2.12479018
+          build-tools: 35.0.0
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Show Gradle version
+        run: ./gradlew --version
+
+      - name: Accept Android licenses (safety net)
+        run: yes | sdkmanager --licenses || true
+
+      - name: Assemble Crisis AI Debug APK
+        run: ./gradlew :app:assembleCrisisAIDebug --stacktrace --no-daemon
+
+      - name: List Debug APK directory
+        run: ls -l app/build/outputs/apk/crisisAI/debug || true
+
+      - name: Upload Crisis AI Debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crisisai-debug-apk
+          path: app/build/outputs/apk/crisisAI/debug/*.apk
+          if-no-files-found: error
+
+      - name: Assemble Crisis AI Release APK (unsigned if no keystore)
+        run: ./gradlew :app:assembleCrisisAIRelease --stacktrace --no-daemon || echo "Release build skipped or failed (likely missing signing config)."
+
+      - name: List Release APK directory
+        run: ls -l app/build/outputs/apk/crisisAI/release || true
+
+      - name: Upload Crisis AI Release APK artifact (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crisisai-release-apk
+          path: app/build/outputs/apk/crisisAI/release/*.apk
+          if-no-files-found: ignore

@@ -28,7 +28,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -216,9 +215,16 @@ fun ChatActivityScreenUI(
 ) {
     val context = LocalContext.current
     val currChat by viewModel.currChatState.collectAsStateWithLifecycle(lifecycleOwner = LocalLifecycleOwner.current)
+    val modelLoadingState by viewModel.modelLoadState.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    LaunchedEffect(currChat) { viewModel.loadModel() }
+
+    LaunchedEffect(currChat, modelLoadingState) {
+        if (currChat != null && modelLoadingState == ModelLoadingState.NOT_LOADED) {
+            viewModel.loadModel()
+        }
+    }
+
     SmolLMAndroidTheme {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -226,7 +232,10 @@ fun ChatActivityScreenUI(
                 DrawerUI(
                     viewModel,
                     onItemClick = { chat ->
+                        // Switch to selected chat and proactively trigger model load immediately
+                        // to avoid cases where recomposition delay leaves UI stuck at "Loading model...".
                         viewModel.switchChat(chat)
+                        viewModel.loadModel()
                         scope.launch { drawerState.close() }
                     },
                     onManageTasksClick = {
@@ -667,84 +676,89 @@ private fun MessageInput(
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(8.dp),
         ) {
-            AnimatedVisibility(modelLoadingState == ModelLoadingState.IN_PROGRESS) {
-                Text(
-                    modifier = Modifier.padding(8.dp),
-                    text = stringResource(R.string.chat_loading_model),
-                )
-            }
-            AnimatedVisibility(modelLoadingState == ModelLoadingState.FAILURE) {
-                Text(
-                    modifier = Modifier.padding(8.dp),
-                    text = stringResource(R.string.chat_model_cannot_be_loaded),
-                )
-            }
-            AnimatedVisibility(modelLoadingState == ModelLoadingState.SUCCESS) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextField(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                        value = questionText,
-                        onValueChange = { questionText = it },
-                        shape = RoundedCornerShape(16.dp),
-                        colors =
-                            TextFieldDefaults.colors(
-                                disabledTextColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent,
-                            ),
-                        placeholder = {
-                            Text(
-                                text = stringResource(R.string.chat_ask_question),
-                            )
-                        },
-                        keyboardOptions =
-                            KeyboardOptions.Default.copy(
-                                capitalization = KeyboardCapitalization.Sentences,
-                                imeAction = ImeAction.Go,
-                            ),
-                        keyboardActions =
-                            KeyboardActions(onGo = {
-                                keyboardController?.hide()
-                                viewModel.sendUserQuery(questionText)
-                                questionText = ""
-                            }),
+            when (modelLoadingState) {
+                ModelLoadingState.IN_PROGRESS -> {
+                    Text(
+                        modifier = Modifier.padding(8.dp),
+                        text = stringResource(R.string.chat_loading_model),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (isGeneratingResponse) {
-                        Box(contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                            IconButton(onClick = { viewModel.stopGeneration() }) {
-                                Icon(FeatherIcons.StopCircle, contentDescription = "Stop")
+                }
+                ModelLoadingState.FAILURE -> {
+                    Text(
+                        modifier = Modifier.padding(8.dp),
+                        text = stringResource(R.string.chat_model_cannot_be_loaded),
+                    )
+                }
+                ModelLoadingState.SUCCESS -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextField(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                            value = questionText,
+                            onValueChange = { questionText = it },
+                            shape = RoundedCornerShape(16.dp),
+                            colors =
+                                TextFieldDefaults.colors(
+                                    disabledTextColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    disabledIndicatorColor = Color.Transparent,
+                                ),
+                            placeholder = {
+                                Text(
+                                    text = stringResource(R.string.chat_ask_question),
+                                )
+                            },
+                            keyboardOptions =
+                                KeyboardOptions.Default.copy(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Go,
+                                ),
+                            keyboardActions =
+                                KeyboardActions(onGo = {
+                                    keyboardController?.hide()
+                                    viewModel.sendUserQuery(questionText)
+                                    questionText = ""
+                                }),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (isGeneratingResponse) {
+                            Box(contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                                IconButton(onClick = { viewModel.stopGeneration() }) {
+                                    Icon(FeatherIcons.StopCircle, contentDescription = "Stop")
+                                }
+                            }
+                        } else {
+                            IconButton(
+                                enabled = questionText.isNotEmpty(),
+                                modifier =
+                                    Modifier.background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        CircleShape,
+                                    ),
+                                onClick = {
+                                    keyboardController?.hide()
+                                    viewModel.sendUserQuery(questionText)
+                                    questionText = ""
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Send,
+                                    contentDescription = "Send text",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
                             }
                         }
-                    } else {
-                        IconButton(
-                            enabled = questionText.isNotEmpty(),
-                            modifier =
-                                Modifier.background(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    CircleShape,
-                                ),
-                            onClick = {
-                                keyboardController?.hide()
-                                viewModel.sendUserQuery(questionText)
-                                questionText = ""
-                            },
-                        ) {
-                            Icon(
-                                imageVector = FeatherIcons.Send,
-                                contentDescription = "Send text",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                        }
                     }
+                }
+                ModelLoadingState.NOT_LOADED -> {
+                    // Do nothing
                 }
             }
         }
