@@ -86,6 +86,9 @@ class ChatScreenViewModel(
     val modelsRepository: ModelsRepository,
     val smolLMManager: SmolLMManager,
 ) : ViewModel() {
+    // Max characters for auto-generated chat title
+    private val AUTO_TITLE_MAX_LEN = 40
+
     enum class ModelLoadingState {
         NOT_LOADED, // model loading not started
         IN_PROGRESS, // model loading in-progress
@@ -221,20 +224,42 @@ class ChatScreenViewModel(
         query: String,
         addMessageToDB: Boolean = true,
     ) {
-        _currChatState.value?.let { chat ->
-            // Update the 'dateUsed' attribute of the current Chat instance
-            // when a query is sent by the user
-            chat.dateUsed = Date()
-            appDB.updateChat(chat)
+        _currChatState.value?.let {
+            var workingChat = it
+            // Auto-name chat using first message (only if still Untitled and not a Task)
+            if (addMessageToDB && !workingChat.isTask && workingChat.name.startsWith("Untitled")) {
+                try {
+                    val existingMessages = appDB.getMessagesForModel(workingChat.id)
+                    if (existingMessages.isEmpty()) {
+                        val sanitized = query.trim().replace(Regex("\\s+"), " ")
+                        if (sanitized.isNotEmpty()) {
+                            val truncated =
+                                if (sanitized.length <= AUTO_TITLE_MAX_LEN) sanitized
+                                else sanitized.substring(0, AUTO_TITLE_MAX_LEN).trimEnd()
+                            if (truncated.isNotEmpty()) {
+                                val renamed = workingChat.copy(name = truncated)
+                                appDB.updateChat(renamed)
+                                _currChatState.value = renamed
+                                workingChat = renamed
+                            }
+                        }
+                    }
+                } catch (_: Exception) { /* ignore auto-naming failures */ }
+            }
 
-            if (chat.isTask) {
+            // Update the 'dateUsed' attribute
+            workingChat = workingChat.copy(dateUsed = Date())
+            appDB.updateChat(workingChat)
+            _currChatState.value = workingChat
+
+            if (workingChat.isTask) {
                 // If the chat is a 'task', delete all existing messages
                 // to maintain the 'stateless' nature of the task
-                appDB.deleteMessages(chat.id)
+                appDB.deleteMessages(workingChat.id)
             }
 
             if (addMessageToDB) {
-                appDB.addUserMessage(chat.id, query)
+                appDB.addUserMessage(workingChat.id, query)
             }
             _isGeneratingResponse.value = true
             _partialResponse.value = ""
@@ -254,7 +279,7 @@ class ChatScreenViewModel(
                     _isGeneratingResponse.value = false
                     responseGenerationsSpeed = response.generationSpeed
                     responseGenerationTimeSecs = response.generationTimeSecs
-                    appDB.updateChat(chat.copy(contextSizeConsumed = response.contextLengthUsed))
+                    appDB.updateChat(workingChat.copy(contextSizeConsumed = response.contextLengthUsed))
                 },
                 onCancelled = {
                     // ignore CancellationException, as it was called because
