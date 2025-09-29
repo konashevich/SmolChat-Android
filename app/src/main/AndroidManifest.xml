@@ -43,6 +43,18 @@
         <activity android:name=".ui.screens.model_download.DownloadModelActivity"/>
 
         <activity android:name=".ui.screens.manage_tasks.ManageTasksActivity"/>
+
+        <activity
+            android:name=".ui.screens.import_model.ImportModelActivity"
+            android:exported="true"
+            android:label="Crisis AI - Import Model">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

@@ -38,10 +38,13 @@ class ModelsRepository(
 
     companion object {
         fun checkIfModelsDownloaded(context: Context): Boolean {
+            // Look in internal files dir
             context.filesDir.listFiles()?.forEach { file ->
-                if (file.isFile && file.name.endsWith(".gguf")) {
-                    return true
-                }
+                if (file.isFile && file.name.endsWith(".gguf")) return true
+            }
+            // Look in external app-specific models dir
+            context.getExternalFilesDir("models")?.listFiles()?.forEach { file ->
+                if (file.isFile && file.name.endsWith(".gguf")) return true
             }
             return false
         }
