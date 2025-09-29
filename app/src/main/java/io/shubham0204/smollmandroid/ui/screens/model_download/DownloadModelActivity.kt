@@ -40,7 +40,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -237,27 +236,28 @@ class DownloadModelActivity : ComponentActivity() {
 
     @Composable
     private fun ModernProgressBar(progress: Float?) {
-        val base = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.18f))
-        Box(base) {
-            if (progress == null) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent,
-                )
-            } else {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent,
-                )
-            }
+        val gradient = Brush.linearGradient(listOf(Color(0xFF7F00FF), Color(0xFFFF0066)))
+        val shape = RoundedCornerShape(12.dp)
+        val track = Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = 0.18f))
+        Box(track) {
+            val fill = (progress ?: 1f).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth(fill)
+                    .height(8.dp)
+                    .clip(shape)
+                    .background(gradient),
+            )
         }
     }
 
     @Composable
     private fun DotsIndicator(currentIndex: Int, total: Int, modifier: Modifier = Modifier) {
+        val gradient = Brush.linearGradient(listOf(Color(0xFF7F00FF), Color(0xFFFF0066)))
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -265,13 +265,23 @@ class DownloadModelActivity : ComponentActivity() {
         ) {
             repeat(total) { i ->
                 val active = i == currentIndex
-                Box(
-                    modifier =
-                        Modifier
-                            .size(if (active) 10.dp else 8.dp)
-                            .clip(CircleShape)
-                            .background(if (active) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f)),
-                )
+                if (active) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(gradient),
+                    )
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.3f)),
+                    )
+                }
             }
         }
     }

@@ -138,7 +138,7 @@ class ChatActivity : ComponentActivity() {
 
         /**
          * Check if the activity was launched by an intent to share text with the app
-         * If yes, then, extract the text and set its value to [viewModel.questionTextDefaultVal]
+         * If yes, then, extract the text and set its value as the initial question text
          */
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
@@ -735,25 +735,17 @@ private fun MessageInput(
                                 }
                             }
                         } else {
-                            IconButton(
+                            // Updated: gradient circular send button (dark center + gradient border)
+                            io.shubham0204.smollmandroid.ui.components.GradientCircularIconButton(
+                                icon = FeatherIcons.Send,
+                                contentDescription = "Send text",
                                 enabled = questionText.isNotEmpty(),
-                                modifier =
-                                    Modifier.background(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        CircleShape,
-                                    ),
                                 onClick = {
                                     keyboardController?.hide()
                                     viewModel.sendUserQuery(questionText)
                                     questionText = ""
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = FeatherIcons.Send,
-                                    contentDescription = "Send text",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                            }
+                            )
                         }
                     }
                 }
