@@ -74,6 +74,7 @@ import io.shubham0204.smollmandroid.R
 import io.shubham0204.smollmandroid.data.Chat
 import io.shubham0204.smollmandroid.data.Folder
 import io.shubham0204.smollmandroid.ui.components.AppAlertDialog
+import io.shubham0204.smollmandroid.ui.components.GradientPrimaryButton
 import io.shubham0204.smollmandroid.ui.components.createAlertDialog
 import io.shubham0204.smollmandroid.ui.components.createTextFieldDialog
 import io.shubham0204.smollmandroid.ui.components.noRippleClickable
@@ -102,7 +103,9 @@ fun DrawerUI(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                Button(
+                GradientPrimaryButton(
+                    text = stringResource(R.string.chat_drawer_new_chat),
+                    leadingIcon = FeatherIcons.Plus,
                     onClick = {
                         scope.launch {
                             val chatCount = viewModel.appDB.getChatsCount()
@@ -119,22 +122,14 @@ fun DrawerUI(
                             }
                         }
                     },
-                ) {
-                    Icon(FeatherIcons.Plus, contentDescription = "New Chat")
-                    Text(
-                        stringResource(R.string.chat_drawer_new_chat),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-                Button(
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                )
+                GradientPrimaryButton(
+                    text = stringResource(R.string.chat_drawer_new_task),
+                    leadingIcon = FeatherIcons.PlusSquare,
                     onClick = onCreateTaskClick,
-                ) {
-                    Icon(FeatherIcons.PlusSquare, contentDescription = "New Task")
-                    Text(
-                        stringResource(R.string.chat_drawer_new_task),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
+                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             ChatsList(

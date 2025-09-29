@@ -23,46 +23,48 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.ArrowLeft
 import io.shubham0204.smollmandroid.R
 import io.shubham0204.smollmandroid.ui.components.AppAlertDialog
-import io.shubham0204.smollmandroid.ui.components.AppBarTitleText
 import io.shubham0204.smollmandroid.ui.components.AppProgressDialog
 import io.shubham0204.smollmandroid.ui.screens.chat.ChatActivity
 import io.shubham0204.smollmandroid.ui.theme.SmolLMAndroidTheme
@@ -101,9 +103,7 @@ class DownloadModelActivity : ComponentActivity() {
                         )
                     }
                     composable("download-model") {
-                        AddNewModelScreen(
-                            onHFModelSelectClick = { navController.navigate("hf-model-select") },
-                        )
+                        AddNewModelScreen()
                     }
                 }
             }
@@ -127,42 +127,24 @@ class DownloadModelActivity : ComponentActivity() {
         DownloadProgress,
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun AddNewModelScreen(onHFModelSelectClick: () -> Unit) {
+    private fun AddNewModelScreen() {
         var addNewModelStep by remember { mutableStateOf(AddNewModelStep.DownloadModel) }
         SmolLMAndroidTheme {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                topBar = {
-                    TopAppBar(
-                        title = { AppBarTitleText(stringResource(R.string.add_new_model_title)) },
-                    )
-                },
             ) { innerPadding ->
                 Surface(
-                    modifier =
-                        Modifier
-                            .padding(innerPadding)
-                            .verticalScroll(rememberScrollState()),
+                    modifier = Modifier.padding(innerPadding).fillMaxSize(),
                 ) {
                     when (addNewModelStep) {
-                        AddNewModelStep.DownloadModel -> {
-                            DownloadModelScreen(
-                                onNextSectionClick = {
-                                    addNewModelStep = AddNewModelStep.DownloadProgress
-                                },
-                                modifier = Modifier.fillMaxSize().padding(8.dp),
-                            )
-                        }
-                        AddNewModelStep.DownloadProgress -> {
-                            DownloadProgressScreen(
-                                onPrevSectionClick = {
-                                    addNewModelStep = AddNewModelStep.DownloadModel
-                                },
-                                modifier = Modifier.fillMaxSize().padding(8.dp),
-                            )
-                        }
+                        AddNewModelStep.DownloadModel -> DownloadModelScreen(
+                            onNextSectionClick = { addNewModelStep = AddNewModelStep.DownloadProgress },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        AddNewModelStep.DownloadProgress -> DownloadProgressScreen(
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
                 AppProgressDialog()
@@ -171,90 +153,155 @@ class DownloadModelActivity : ComponentActivity() {
         }
     }
 
+    // STEP 1: full-screen image + swipe left => next + dots
     @Composable
     private fun DownloadModelScreen(
         onNextSectionClick: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
-        Column(modifier = modifier) {
-            Text(
-                text = "Welcome to CrisisAI",
-                style = MaterialTheme.typography.headlineSmall,
+        var swipeTriggered by remember { mutableStateOf(false) }
+        Box(
+            modifier =
+                modifier
+                    .background(Color.Black)
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { _, dragAmount ->
+                                totalDrag += dragAmount
+                                if (totalDrag < -120f && !swipeTriggered) {
+                                    swipeTriggered = true
+                                    onNextSectionClick()
+                                }
+                            },
+                            onDragEnd = { totalDrag = 0f },
+                            onDragCancel = { totalDrag = 0f },
+                        )
+                    },
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.intro_slide_1),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
-            Text(
-                "Your personal AI assistant for crisis situations.",
-                style = MaterialTheme.typography.labelSmall,
+            DotsIndicator(
+                currentIndex = 0,
+                total = 2,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                onClick = {
-                    // Proceed to next screen; ensureDefaultModel runs there
-                    onNextSectionClick()
-                },
-            ) {
-                Text(stringResource(R.string.button_text_next))
-            }
         }
     }
 
+    // STEP 2: full-screen image + progress overlay + finish + dots
     @Composable
     private fun DownloadProgressScreen(
-        onPrevSectionClick: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
         val downloadProgress by viewModel.downloadProgress
         val isDownloaded by viewModel.isDownloaded
         val isCopyInProgress by viewModel.isCopyInProgress
-        val setupMessage by viewModel.setupMessage.collectAsState(initial = "")
 
-        // Start ensure logic once
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            viewModel.ensureDefaultModel()
-        }
+        LaunchedEffect(Unit) { viewModel.ensureDefaultModel() }
 
-        Column(modifier = modifier) {
-            Text(
-                text = when {
-                    isDownloaded -> "Model Ready"
-                    isCopyInProgress -> "Copying model..."
-                    downloadProgress > 0f -> "Downloading model..."
-                    else -> "Setting up model..."
-                },
-                style = MaterialTheme.typography.headlineSmall,
+        Box(modifier = modifier.background(Color.Black)) {
+            Image(
+                painter = painterResource(id = R.drawable.intro_slide_2),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            when {
-                !isDownloaded && isCopyInProgress -> {
-                    // Copying from Downloads: do not show a progress bar per requirements
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                when {
+                    !isDownloaded && isCopyInProgress -> { /* hidden during copy */ }
+                    !isDownloaded && downloadProgress > 0f -> ModernProgressBar(progress = downloadProgress)
+                    !isDownloaded && downloadProgress == 0f -> ModernProgressBar(progress = null)
                 }
-                !isDownloaded && downloadProgress > 0f -> {
-                    LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
-                }
+                StartGradientButton(
+                    enabled = isDownloaded,
+                    onClick = { if (isDownloaded) openChatActivity() },
+                )
+                DotsIndicator(currentIndex = 1, total = 2)
             }
-            if (!isDownloaded && setupMessage.isNotEmpty() && !isCopyInProgress && downloadProgress == 0f) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(setupMessage, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+
+    @Composable
+    private fun ModernProgressBar(progress: Float?) {
+        val base = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.18f))
+        Box(base) {
+            if (progress == null) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent,
+                )
+            } else {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent,
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+
+    @Composable
+    private fun DotsIndicator(currentIndex: Int, total: Int, modifier: Modifier = Modifier) {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(total) { i ->
+                val active = i == currentIndex
+                Box(
+                    modifier =
+                        Modifier
+                            .size(if (active) 10.dp else 8.dp)
+                            .clip(CircleShape)
+                            .background(if (active) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f)),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun StartGradientButton(enabled: Boolean, onClick: () -> Unit) {
+        val shape = RoundedCornerShape(24.dp)
+        val activeGradient = Brush.linearGradient(listOf(Color(0xFF7F00FF), Color(0xFFFF0066)))
+        val inactiveGradient = Brush.linearGradient(listOf(Color(0xFF333333), Color(0xFF222222)))
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(if (enabled) activeGradient else inactiveGradient)
+                    .padding(2.dp), // border thickness
+        ) {
             Button(
-                onClick = { if (isDownloaded) openChatActivity() },
-                enabled = isDownloaded,
-                shape = RoundedCornerShape(4.dp),
+                onClick = onClick,
+                enabled = enabled,
+                shape = shape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF101010),
+                    disabledContainerColor = Color(0xFF181818),
+                    contentColor = Color.White,
+                    disabledContentColor = Color(0xFF444444), // darker inactive text
+                ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Finish")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                OutlinedButton(
-                    onClick = onPrevSectionClick,
-                    enabled = !isDownloaded && !isCopyInProgress && downloadProgress == 0f,
-                ) {
-                    Icon(FeatherIcons.ArrowLeft, contentDescription = null)
-                    Text(stringResource(R.string.button_text_back))
-                }
+                Text("Start")
             }
         }
     }
