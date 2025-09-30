@@ -28,5 +28,6 @@ class SmolChatApplication : Application() {
             androidContext(this@SmolChatApplication)
             modules(KoinAppModule().module)
         }
+        // Removed background subscription verification; Play auto-renew handles annual billing.
     }
 }

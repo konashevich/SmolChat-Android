@@ -121,6 +121,7 @@ import io.shubham0204.smollmandroid.ui.screens.chat.dialogs.createChatMessageOpt
 import io.shubham0204.smollmandroid.ui.screens.manage_tasks.ManageTasksActivity
 import io.shubham0204.smollmandroid.ui.screens.manage_tasks.TasksList
 import io.shubham0204.smollmandroid.ui.theme.SmolLMAndroidTheme
+import io.shubham0204.smollmandroid.subscription.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -130,11 +131,14 @@ private val LOGD: (String) -> Unit = { Log.d(LOGTAG, it) }
 
 class ChatActivity : ComponentActivity() {
     private val viewModel: ChatScreenViewModel by inject()
+    private val subscriptionManager by inject<SubscriptionManager>()
+    private val networkStatusMonitor by inject<NetworkStatusMonitor>()
     private var modelUnloaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        subscriptionManager.evaluateState()
 
         /**
          * Check if the activity was launched by an intent to share text with the app
@@ -163,25 +167,58 @@ class ChatActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
+            val entitlementState by subscriptionManager.stateFlow.collectAsState()
+            val isOnline by networkStatusMonitor.isOnline.collectAsState()
+
+            // Periodic / conditional sync when coming online
+            LaunchedEffect(isOnline, entitlementState) {
+                if (isOnline && subscriptionManager.shouldAttemptSync()) {
+                    subscriptionManager.syncFromBilling()
+                }
+                // Re-evaluate local state to catch boundary transitions
+                subscriptionManager.evaluateState()
+            }
+
+            val showRenewPrompt = subscriptionManager.shouldShowRenewalPrompt()
             Box(modifier = Modifier.safeDrawingPadding()) {
-                NavHost(
-                    navController = navController,
-                    startDestination = "chat",
-                    enterTransition = { fadeIn() },
-                    exitTransition = { fadeOut() },
-                ) {
-                    composable("edit-chat") {
-                        EditChatSettingsScreen(
-                            viewModel,
-                            onBackClicked = { navController.navigateUp() },
+                Column {
+                    if (entitlementState == EntitlementState.SURVIVAL_MODE) {
+                        val showVerify = isOnline && subscriptionManager.isVerificationDebt()
+                        SurvivalModeBanner(
+                            onRenewClick = { startActivity(Intent(this@ChatActivity, PaywallActivity::class.java)) },
+                            onVerifyNow = { subscriptionManager.syncFromBilling() },
+                            showVerify = showVerify,
                         )
                     }
-                    composable("chat") {
-                        ChatActivityScreenUI(
-                            viewModel,
-                            onEditChatParamsClick = { navController.navigate("edit-chat") },
-                        )
+                    if (isOnline && subscriptionManager.isVerificationDebt()) {
+                        VerificationDebtBar(onVerify = { subscriptionManager.syncFromBilling() })
                     }
+                    NavHost(
+                        navController = navController,
+                        startDestination = "chat",
+                        enterTransition = { fadeIn() },
+                        exitTransition = { fadeOut() },
+                    ) {
+                        composable("edit-chat") {
+                            EditChatSettingsScreen(viewModel, onBackClicked = { navController.navigateUp() })
+                        }
+                        composable("chat") {
+                            ChatActivityScreenUI(viewModel, onEditChatParamsClick = { navController.navigate("edit-chat") })
+                        }
+                    }
+                }
+                if (showRenewPrompt) {
+                    RenewalPromptDialog(
+                        onRenew = {
+                            subscriptionManager.suppressRenewalPrompt(days = 0)
+                            startActivity(Intent(this@ChatActivity, PaywallActivity::class.java))
+                        },
+                        onLater = { subscriptionManager.suppressRenewalPrompt(days = 1) },
+                    )
+                }
+                // Show debug overlay only when survival mode or verification debt for signal, without BuildConfig.
+                if (entitlementState == EntitlementState.SURVIVAL_MODE || subscriptionManager.isVerificationDebt()) {
+                    DebugSubscriptionOverlay(subscriptionManager = subscriptionManager, isOnline = isOnline)
                 }
             }
         }

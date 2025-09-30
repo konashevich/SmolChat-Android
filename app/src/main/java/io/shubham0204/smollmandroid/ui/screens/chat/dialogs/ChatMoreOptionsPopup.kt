@@ -16,6 +16,7 @@
 
 package io.shubham0204.smollmandroid.ui.screens.chat.dialogs
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,9 +40,12 @@ import compose.icons.feathericons.Delete
 import compose.icons.feathericons.Folder
 import compose.icons.feathericons.Layout
 import compose.icons.feathericons.Package
+import compose.icons.feathericons.RefreshCcw
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.XCircle
+import io.shubham0204.smollmandroid.EthicsActivity
 import io.shubham0204.smollmandroid.R
+import io.shubham0204.smollmandroid.subscription.SubscriptionManager
 import io.shubham0204.smollmandroid.ui.components.createAlertDialog
 import io.shubham0204.smollmandroid.ui.screens.chat.ChatScreenUIEvent
 import io.shubham0204.smollmandroid.ui.screens.chat.ChatScreenViewModel
@@ -50,6 +54,7 @@ import io.shubham0204.smollmandroid.ui.screens.chat.ChatScreenViewModel
 fun ChatMoreOptionsPopup(
     viewModel: ChatScreenViewModel,
     onEditChatSettingsClick: () -> Unit,
+    subscriptionManager: SubscriptionManager? = null,
 ) {
     val expanded by viewModel.showMoreOptionsPopupState.collectAsStateWithLifecycle()
     val showRAMUsageLabel by viewModel.showRAMUsageLabel.collectAsStateWithLifecycle()
@@ -229,6 +234,26 @@ fun ChatMoreOptionsPopup(
             },
             onClick = {
                 viewModel.toggleRAMUsageLabelVisibility()
+                viewModel.onEvent(ChatScreenUIEvent.DialogEvents.ToggleMoreOptionsPopup(visible = false))
+            },
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalDivider(modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(4.dp))
+        DropdownMenuItem(
+            leadingIcon = { Icon(FeatherIcons.RefreshCcw, contentDescription = "Verify Subscription", tint = MaterialTheme.colorScheme.secondary) },
+            text = { Text("Verify Subscription", style = MaterialTheme.typography.labelMedium) },
+            onClick = {
+                subscriptionManager?.refreshIfNeeded(force = true)
+                viewModel.onEvent(ChatScreenUIEvent.DialogEvents.ToggleMoreOptionsPopup(visible = false))
+            },
+        )
+        DropdownMenuItem(
+            leadingIcon = { Icon(FeatherIcons.HelpCircle, contentDescription = "Ethics", tint = MaterialTheme.colorScheme.secondary) },
+            text = { Text("Ethics / Survival Policy", style = MaterialTheme.typography.labelMedium) },
+            onClick = {
+                val ctx = LocalContext.current
+                ctx.startActivity(Intent(ctx, EthicsActivity::class.java))
                 viewModel.onEvent(ChatScreenUIEvent.DialogEvents.ToggleMoreOptionsPopup(visible = false))
             },
         )
