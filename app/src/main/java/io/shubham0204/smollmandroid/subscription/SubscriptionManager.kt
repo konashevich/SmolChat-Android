@@ -27,26 +27,29 @@ class SubscriptionManager(
     @Volatile private var cachedRecord: SubscriptionRecord? = null
 
     private val metaPrefs: SharedPreferences = context.getSharedPreferences("subscription_meta", Context.MODE_PRIVATE)
-    private var lastSyncAttemptUtc: Long = 0L
 
     init {
+        // Single sync attempt when billing connection established
         billingInteractor.startConnection { syncFromBilling() }
         CoroutineScope(Dispatchers.IO).launch {
-            billingInteractor.lastPurchaseResult.collectLatest { p -> p?.let { applyPurchase(it) } }
+            billingInteractor.lastPurchaseResult.collectLatest { purchase: Purchase? ->
+                purchase?.let { applyPurchase(it) }
+            }
         }
     }
 
-    // EntitlementProvider API
+    // Public API
     override fun isFeatureAccessAllowed(): Boolean = state == EntitlementState.ACTIVE || state == EntitlementState.SURVIVAL_MODE
     override fun currentState(): EntitlementState = state
     override fun accessModeLabel(): String = state.label()
-    override fun refreshIfNeeded(force: Boolean) { if (force || shouldAttemptSync()) syncFromBilling() else evaluateState() }
+    override fun refreshIfNeeded(force: Boolean) {
+        evaluateState()
+        if (force) syncFromBilling()
+    }
     override fun beginPurchase(activity: Activity, onResult: (PurchaseOutcome) -> Unit) {
         billingInteractor.launchPurchase(activity) { outcome -> onResult(outcome) }
     }
 
-    fun shouldAttemptSync(nowUtc: Long = System.currentTimeMillis()): Boolean = (nowUtc - lastSyncAttemptUtc) > SubscriptionPolicy.VERIFY_INTERVAL_MIN_MS
-    private fun markSyncAttempt(nowUtc: Long = System.currentTimeMillis()) { lastSyncAttemptUtc = nowUtc }
     fun getTransitionLog(): String = metaPrefs.getString("transition_log", "") ?: ""
 
     fun shouldShowRenewalPrompt(nowUtc: Long = System.currentTimeMillis()): Boolean {
@@ -93,7 +96,6 @@ class SubscriptionManager(
     }
 
     fun syncFromBilling(nowUtc: Long = System.currentTimeMillis(), elapsed: Long = SystemClock.elapsedRealtime()) {
-        markSyncAttempt(nowUtc)
         billingInteractor.queryActivePurchase { purchase ->
             if (purchase != null) {
                 applyPurchase(purchase, nowUtc, elapsed)
@@ -121,7 +123,6 @@ class SubscriptionManager(
             purchaseToken = purchase.purchaseToken,
             entitlementState = EntitlementState.ACTIVE,
             survivalModeActivatedAtUtc = null,
-            verificationDebt = false,
             clockSuspicious = false,
             systemElapsedRealtimeAtVerification = elapsed,
             autoRenewing = purchase.isAutoRenewing,
@@ -135,7 +136,6 @@ class SubscriptionManager(
         if (new != state) {
             val old = state
             state = new
-            // Persist entitlementState if we have a record
             cachedRecord?.let { rec ->
                 val updated = rec.copy(entitlementState = new)
                 store.write(updated)

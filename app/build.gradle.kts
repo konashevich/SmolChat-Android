@@ -134,8 +134,8 @@ dependencies {
     // https://github.com/DevSrSouza/compose-icons
     implementation(libs.composeIcons.feather)
 
+    // Google Play Billing (correct alias)
     implementation(libs.androidx.billing.ktx)
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

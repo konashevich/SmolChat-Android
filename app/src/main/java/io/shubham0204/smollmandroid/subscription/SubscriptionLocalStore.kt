@@ -28,7 +28,6 @@ class SubscriptionLocalStore(context: Context) {
             purchaseToken = o.optString("purchaseToken", ""),
             entitlementState = o.optString("entitlementState", EntitlementState.NOT_ENTITLED.name).let { runCatching { EntitlementState.valueOf(it) }.getOrDefault(EntitlementState.NOT_ENTITLED) },
             survivalModeActivatedAtUtc = if (o.has("survivalModeActivatedAtUtc") && !o.isNull("survivalModeActivatedAtUtc")) o.getLong("survivalModeActivatedAtUtc") else null,
-            verificationDebt = o.optBoolean("verificationDebt", false),
             clockSuspicious = o.optBoolean("clockSuspicious", false),
             systemElapsedRealtimeAtVerification = o.optLong("systemElapsedRealtimeAtVerification", 0L),
             autoRenewing = o.optBoolean("autoRenewing", true),
@@ -42,7 +41,6 @@ class SubscriptionLocalStore(context: Context) {
         put("purchaseToken", r.purchaseToken)
         put("entitlementState", r.entitlementState.name)
         if (r.survivalModeActivatedAtUtc != null) put("survivalModeActivatedAtUtc", r.survivalModeActivatedAtUtc) else put("survivalModeActivatedAtUtc", JSONObject.NULL)
-        put("verificationDebt", r.verificationDebt)
         put("clockSuspicious", r.clockSuspicious)
         put("systemElapsedRealtimeAtVerification", r.systemElapsedRealtimeAtVerification)
         put("autoRenewing", r.autoRenewing)
@@ -51,7 +49,7 @@ class SubscriptionLocalStore(context: Context) {
     companion object { private const val KEY_JSON = "state_json" }
 }
 
-// Persistent record of subscription & survival context
+// Persistent record of subscription & survival context (simplified – verificationDebt removed)
 data class SubscriptionRecord(
     val purchaseStartUtc: Long,
     val lastKnownExpiryUtc: Long,
@@ -59,7 +57,6 @@ data class SubscriptionRecord(
     val purchaseToken: String,
     val entitlementState: EntitlementState,
     val survivalModeActivatedAtUtc: Long?,
-    val verificationDebt: Boolean,
     val clockSuspicious: Boolean,
     val systemElapsedRealtimeAtVerification: Long,
     val autoRenewing: Boolean,

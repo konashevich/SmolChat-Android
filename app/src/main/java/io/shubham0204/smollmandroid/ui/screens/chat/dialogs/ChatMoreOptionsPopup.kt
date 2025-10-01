@@ -249,11 +249,10 @@ fun ChatMoreOptionsPopup(
             },
         )
         DropdownMenuItem(
-            leadingIcon = { Icon(FeatherIcons.HelpCircle, contentDescription = "Ethics", tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = { Icon(FeatherIcons.Settings, contentDescription = "Ethics", tint = MaterialTheme.colorScheme.secondary) },
             text = { Text("Ethics / Survival Policy", style = MaterialTheme.typography.labelMedium) },
             onClick = {
-                val ctx = LocalContext.current
-                ctx.startActivity(Intent(ctx, EthicsActivity::class.java))
+                context.startActivity(Intent(context, EthicsActivity::class.java))
                 viewModel.onEvent(ChatScreenUIEvent.DialogEvents.ToggleMoreOptionsPopup(visible = false))
             },
         )

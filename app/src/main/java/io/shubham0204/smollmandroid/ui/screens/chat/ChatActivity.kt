@@ -170,12 +170,9 @@ class ChatActivity : ComponentActivity() {
             val entitlementState by subscriptionManager.stateFlow.collectAsState()
             val isOnline by networkStatusMonitor.isOnline.collectAsState()
 
-            // Periodic / conditional sync when coming online
-            LaunchedEffect(isOnline, entitlementState) {
-                if (isOnline && subscriptionManager.shouldAttemptSync()) {
-                    subscriptionManager.syncFromBilling()
-                }
-                // Re-evaluate local state to catch boundary transitions
+            // Sync once when coming online; always re-evaluate local state
+            LaunchedEffect(isOnline) {
+                if (isOnline) subscriptionManager.syncFromBilling()
                 subscriptionManager.evaluateState()
             }
 
@@ -183,15 +180,11 @@ class ChatActivity : ComponentActivity() {
             Box(modifier = Modifier.safeDrawingPadding()) {
                 Column {
                     if (entitlementState == EntitlementState.SURVIVAL_MODE) {
-                        val showVerify = isOnline && subscriptionManager.isVerificationDebt()
                         SurvivalModeBanner(
-                            onRenewClick = { startActivity(Intent(this@ChatActivity, PaywallActivity::class.java)) },
-                            onVerifyNow = { subscriptionManager.syncFromBilling() },
-                            showVerify = showVerify,
+                            onRenewClick = { startActivity(Intent(this@ChatActivity, io.shubham0204.smollmandroid.PaywallActivity::class.java)) },
+                            onVerifyNow = if (isOnline) { { subscriptionManager.syncFromBilling() } } else null,
+                            showVerify = isOnline,
                         )
-                    }
-                    if (isOnline && subscriptionManager.isVerificationDebt()) {
-                        VerificationDebtBar(onVerify = { subscriptionManager.syncFromBilling() })
                     }
                     NavHost(
                         navController = navController,
@@ -211,13 +204,12 @@ class ChatActivity : ComponentActivity() {
                     RenewalPromptDialog(
                         onRenew = {
                             subscriptionManager.suppressRenewalPrompt(days = 0)
-                            startActivity(Intent(this@ChatActivity, PaywallActivity::class.java))
+                            startActivity(Intent(this@ChatActivity, io.shubham0204.smollmandroid.PaywallActivity::class.java))
                         },
                         onLater = { subscriptionManager.suppressRenewalPrompt(days = 1) },
                     )
                 }
-                // Show debug overlay only when survival mode or verification debt for signal, without BuildConfig.
-                if (entitlementState == EntitlementState.SURVIVAL_MODE || subscriptionManager.isVerificationDebt()) {
+                if (entitlementState == EntitlementState.SURVIVAL_MODE) {
                     DebugSubscriptionOverlay(subscriptionManager = subscriptionManager, isOnline = isOnline)
                 }
             }
@@ -402,7 +394,7 @@ private fun RAMUsageLabel(viewModel: ChatScreenViewModel) {
         if (showRAMUsageLabel) {
             while (true) {
                 val (used, total) = viewModel.getCurrentMemoryUsage()
-                labelText = context.getString(R.string.label_device_ram).format(used, total)
+                labelText = context.getString(R.string.label_device_ram, used, total)
                 delay(3000L)
             }
         }
