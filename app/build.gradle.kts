@@ -35,11 +35,13 @@ android {
     productFlavors {
         create("smolChat") { // This will be the default/original flavor
             dimension = "branding"
+            buildConfigField("boolean", "BILLING_BYPASS", "false")
         }
         create("crisisAI") {
             dimension = "branding"
             applicationIdSuffix = ".crisisai"
             resValue("string", "app_name", "Crisis AI")
+            buildConfigField("boolean", "BILLING_BYPASS", "true")
         }
     }
 
@@ -69,6 +71,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {

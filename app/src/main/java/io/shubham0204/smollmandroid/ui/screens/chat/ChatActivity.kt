@@ -209,9 +209,6 @@ class ChatActivity : ComponentActivity() {
                         onLater = { subscriptionManager.suppressRenewalPrompt(days = 1) },
                     )
                 }
-                if (entitlementState == EntitlementState.SURVIVAL_MODE) {
-                    DebugSubscriptionOverlay(subscriptionManager = subscriptionManager, isOnline = isOnline)
-                }
             }
         }
     }

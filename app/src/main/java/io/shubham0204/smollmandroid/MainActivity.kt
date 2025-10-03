@@ -29,21 +29,10 @@ import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
     private val modelsRepository by inject<ModelsRepository>()
-    private val subscriptionManager by inject<SubscriptionManager>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        // Evaluate subscription state early
-        subscriptionManager.evaluateState()
-        if (subscriptionManager.currentState() == EntitlementState.NOT_ENTITLED) {
-            Intent(this, PaywallActivity::class.java).apply {
-                startActivity(this)
-                finish()
-                return
-            }
-        }
 
         // Redirect user to the DownloadModelActivity if no models are available
         // as the app requires at least one model to function
