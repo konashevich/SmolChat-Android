@@ -39,10 +39,13 @@ class PaywallActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         subscriptionManager.evaluateState()
+        // Bypass paywall entirely if build config flag enabled (debug builds)
+        if (BuildConfig.BILLING_BYPASS) {
+            navigateForward(); return
+        }
         if (subscriptionManager.currentState() != EntitlementState.NOT_ENTITLED) {
             navigateForward(); return
         }
-        billingInteractor.startConnection {}
         setContent {
             val price = billingInteractor.priceFlow.collectAsState().value
             val entitlement = subscriptionManager.stateFlow.collectAsState().value
@@ -60,7 +63,7 @@ class PaywallActivity : ComponentActivity() {
                                     is PurchaseOutcome.Success -> "Purchase successful"
                                     is PurchaseOutcome.Cancelled -> "Purchase cancelled"
                                     is PurchaseOutcome.Error -> "Error: ${outcome.message}"
-                                }
+                                 }
                             }
                         },
                         onRestore = { subscriptionManager.refreshIfNeeded(force = true) },

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.annotation.Single
+import io.shubham0204.smollmandroid.BuildConfig
 
 @Single
 class SubscriptionManager(
@@ -36,6 +37,25 @@ class SubscriptionManager(
                 purchase?.let { applyPurchase(it) }
             }
         }
+    }
+
+    // Debug helper: activate entitlement instantly when billing bypass is on
+    fun debugBypassActivate(nowUtc: Long = System.currentTimeMillis(), elapsed: Long = SystemClock.elapsedRealtime()) {
+        if (!BuildConfig.BILLING_BYPASS) return
+        val record = SubscriptionRecord(
+            purchaseStartUtc = nowUtc,
+            lastKnownExpiryUtc = nowUtc + SubscriptionPolicy.YEAR_MS,
+            lastVerificationUtc = nowUtc,
+            purchaseToken = "DEBUG-BYPASS",
+            entitlementState = EntitlementState.ACTIVE,
+            survivalModeActivatedAtUtc = null,
+            clockSuspicious = false,
+            systemElapsedRealtimeAtVerification = elapsed,
+            autoRenewing = false,
+        )
+        store.write(record)
+        cachedRecord = record
+        updateState(EntitlementState.ACTIVE)
     }
 
     // Public API
